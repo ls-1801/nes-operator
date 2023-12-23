@@ -1,0 +1,17 @@
+logLevel: LOG_ERROR
+localWorkerIp: worker
+coordinatorIp: coordinator
+physicalSource:
+  type: TCPConfig
+  configuration:
+    socketHost: source1
+    socketPort: 8080
+    socketDomain: AF_INET
+    socketType: AF_STREAM
+    flushIntervalMS: 100
+    inputFormat: JSON
+    decideMessageSize: TUPLE_SEPARATOR
+    tupleSeparator: '|'
+  logicalSourceName: source1
+  physicalSourceName: source1_phys
+

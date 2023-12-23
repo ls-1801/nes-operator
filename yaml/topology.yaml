@@ -1,0 +1,26 @@
+apiVersion: kube.rs/v1
+kind: Topology
+metadata:
+  name: Test
+spec:
+  nodes:
+    - name: coordinator
+    - name: worker1
+      downstream: [coordinator]
+      source:
+        tcp:
+          host: source1
+          port: 8080
+    - name: worker2
+      downstream: [worker1]
+      source:
+        tcp:
+          host: source2
+          port: 8080
+    - name: worker3
+      downstream: [worker1]
+      source:
+        tcp:
+          host: source3
+          port: 8080
+

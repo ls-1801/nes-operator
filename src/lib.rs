@@ -13,8 +13,8 @@ pub enum Error {
     // so boxing this error to break cycles
     FinalizerError(#[source] Box<kube::runtime::finalizer::Error<Error>>),
 
-    #[error("IllegalDocument")]
-    IllegalDocument,
+    #[error("IllegalTopology")]
+    IllegalTopology,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -24,8 +24,9 @@ impl Error {
     }
 }
 
-/// Expose all controller components used by main
 pub mod controller;
+/// Expose all controller components used by main
+pub mod nes_config;
 pub use crate::controller::*;
 
 /// Log and trace integrations
@@ -35,4 +36,5 @@ pub mod telemetry;
 mod metrics;
 pub use metrics::Metrics;
 
-#[cfg(test)] pub mod fixtures;
+#[cfg(test)]
+pub mod fixtures;
