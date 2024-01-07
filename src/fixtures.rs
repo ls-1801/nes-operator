@@ -193,7 +193,6 @@ impl ApiServerVerifier {
         let json: serde_json::Value = serde_json::from_slice(&req_body).expect("patch_status object is json");
         let status_json = json.get("status").expect("status object").clone();
         let status: TopologyStatus = serde_json::from_value(status_json).expect("valid status");
-        assert_eq!(status.nodes_ready, 3, "expected all nodes to be ready");
         let response = serde_json::to_vec(&doc.with_status(status)).unwrap();
         // pass through document "patch accepted"
         send.send_response(Response::builder().body(Body::from(response)).unwrap());

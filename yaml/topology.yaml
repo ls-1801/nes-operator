@@ -1,26 +1,346 @@
+apiVersion: v1
+data:
+  query.json: |
+    {
+      "userQuery": "Query::from(\"input1\").joinWith(Query::from(\"input2\")                      .joinWith(Query::from(\"input3\"))                      .where(Attribute(\"id\"))                      .equalsTo(Attribute(\"id\"))                     .window(TumblingWindow::of(EventTime(Attribute(\"timestamp\")), Milliseconds(2))))       .where(Attribute(\"id\"))       .equalsTo(Attribute(\"id\"))       .window(TumblingWindow::of(EventTime(Attribute(\"timestamp\")), Milliseconds(2)))       .sink(ThroughputSinkDescriptor::create());",
+      "placement": "BottomUp"
+    }
+kind: ConfigMap
+metadata:
+  name: query-config
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: query
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+    - name: task-pv-container
+      imagePullPolicy: Always
+      image: localhost:5000/query
+      volumeMounts:
+        - name: query-volume
+          mountPath: /query
+  volumes:
+    - name: query-volume
+      configMap:
+        name: query-config
+
+---
+apiVersion: v1
+data:
+  export.yaml: |
+      sources:
+        - schema:
+            fields:
+              - name: input2$timestamp
+                type: UINT64
+              - name: input2$id
+                type: INT64
+          ip: 0.0.0.0
+          port: 8091
+          type: TcpSource
+          delayInMS: 200
+        - schema:
+            fields:
+              - name: input2$timestamp
+                type: UINT64
+              - name: input2$id
+                type: INT64
+          ip: 0.0.0.0
+          port: 8091
+          delayInMS: 200
+          type: TcpSource
+        - schema:
+            fields:
+              - name: input3$timestamp
+                type: UINT64
+              - name: input3$id
+                type: INT64
+          ip: 0.0.0.0
+          port: 8091
+          delayInMS: 200
+          type: TcpSource
+      sink:
+        schema:
+          fields:
+            - name: input2input3$start
+              type: UINT64
+            - name: input2input3$end
+              type: UINT64
+            - name: input2input3$key
+              type: INT64
+            - name: input2$timestamp
+              type: UINT64
+            - name: input2$id
+              type: INT64
+            - name: input3$timestamp
+              type: UINT64
+            - name: input3$id
+              type: INT64
+        ip: 127.0.0.1
+        port: 8080
+        operatorId: 11
+        nodeId: 1
+        subQueryID: 6
+      query:
+        queryID: 0
+        workerID: 1
+      workers:
+        - ip: 127.0.0.1
+          port: 8083
+          nodeId: 4
+          subQueries:
+            - upstream:
+                tcpSource:
+                  port: 8092
+                  originId: 3
+                  ip: 127.0.0.1
+                  schema:
+                    fields:
+                      - name: input3$timestamp
+                        type: UINT64
+                      - name: input3$id
+                        type: INT64
+                operatorId: 16
+              subQueryId: 1
+              outputSchemaSizeInBytes: 16
+              type: node
+              downstream:
+                ip: 127.0.0.1
+                port: 8081
+                partitionId: 0
+                nodeId: 2
+                subpartitionId: 0
+                operatorId: 9
+        - ip: 127.0.0.1
+          port: 8081
+          nodeId: 2
+          subQueries:
+            - stage:
+                stageId: 4
+                numberOfOperatorHandlers: 1
+                predecessor:
+                  - stageId: 5
+                    numberOfOperatorHandlers: 1
+                    upstream:
+                      worker:
+                        ip: 127.0.0.1
+                        port: 8082
+                        partitionId: 0
+                        nodeId: 3
+                        subpartitionId: 0
+                        operatorId: 13
+                      operatorId: 13
+                  - stageId: 7
+                    numberOfOperatorHandlers: 1
+                    upstream:
+                      worker:
+                        ip: 127.0.0.1
+                        port: 8083
+                        partitionId: 0
+                        nodeId: 4
+                        subpartitionId: 0
+                        operatorId: 9
+                      operatorId: 9
+              subQueryId: 5
+              outputSchemaSizeInBytes: 56
+              type: node
+              downstream:
+                ip: 127.0.0.1
+                port: 8080
+                partitionId: 0
+                nodeId: 1
+                subpartitionId: 0
+                operatorId: 11
+        - ip: 127.0.0.1
+          port: 8082
+          nodeId: 3
+          subQueries:
+            - upstream:
+                tcpSource:
+                  port: 8091
+                  originId: 2
+                  ip: 127.0.0.1
+                  schema:
+                    fields:
+                      - name: input2$timestamp
+                        type: UINT64
+                      - name: input2$id
+                        type: INT64
+                operatorId: 32
+              subQueryId: 3
+              outputSchemaSizeInBytes: 16
+              type: node
+              downstream:
+                ip: 127.0.0.1
+                port: 8081
+                partitionId: 0
+                nodeId: 2
+                subpartitionId: 0
+                operatorId: 13
+kind: ConfigMap
+metadata:
+  name: source-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: source2
+spec:
+  clusterIP: 10.96.0.12
+  ports:
+    - name: data
+      port: 8091
+      targetPort: 8091
+      protocol: TCP
+  selector:
+    source-id: "2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: source1
+spec:
+  clusterIP: 10.96.0.11
+  ports:
+    - name: data
+      port: 8091
+      targetPort: 8091
+      protocol: TCP
+  selector:
+    source-id: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: source0
+spec:
+  clusterIP: 10.96.0.13
+  ports:
+    - name: data
+      port: 8091
+      targetPort: 8091
+      protocol: TCP
+  selector:
+    source-id: "0"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: source0
+  labels:
+    source-id: "0"
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+    - name: source0
+      ports:
+        - name: data
+          containerPort: 8091
+      env:
+        - name: SOURCE_ID
+          value: "0"
+      imagePullPolicy: Always
+      image: localhost:5000/nes-source:latest
+      volumeMounts:
+        - name: config-volume
+          mountPath: /config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: source-config
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    source-id: "1"
+  name: source1
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+    - name: source1
+      env:
+        - name: SOURCE_ID
+          value: "1"
+      imagePullPolicy: Always
+      image: localhost:5000/nes-source:latest
+      volumeMounts:
+        - name: config-volume
+          mountPath: /config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: source-config
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    source-id: "2"
+  name: source2
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+    - name: source2
+      env:
+        - name: SOURCE_ID
+          value: "2"
+      imagePullPolicy: Always
+      image: localhost:5000/nes-source:latest
+      volumeMounts:
+        - name: config-volume
+          mountPath: /config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: source-config
+---
 apiVersion: kube.rs/v1
 kind: Topology
 metadata:
-  name: Test
+  name: test
 spec:
   nodes:
-    - name: coordinator
-    - name: worker1
-      downstream: [coordinator]
-      source:
-        tcp:
-          host: source1
-          port: 8080
-    - name: worker2
-      downstream: [worker1]
-      source:
-        tcp:
-          host: source2
-          port: 8080
-    - name: worker3
-      downstream: [worker1]
-      source:
-        tcp:
-          host: source3
-          port: 8080
-
+    worker1:
+      downstream: coordinator
+      sources:
+        source1:
+          logicalSource: input1
+          schema:
+          - name: timestamp
+            type: UINT64
+          - name: id
+            type: INT64
+          tcp:
+            host: 10.96.0.13
+            port: 8091
+    worker2:
+      downstream: worker1
+      sources:
+        source2:
+          logicalSource: input2
+          schema:
+          - name: timestamp
+            type: UINT64
+          - name: id
+            type: INT64
+          tcp:
+            host: 10.96.0.11
+            port: 8091
+    worker3:
+      downstream: worker1
+      sources:
+        source3:
+          logicalSource: input3
+          schema:
+          - name: timestamp
+            type: UINT64
+          - name: id
+            type: INT64
+          tcp:
+            host: 10.96.0.12
+            port: 8091

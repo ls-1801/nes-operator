@@ -1,0 +1,30 @@
+
+apiVersion: v1
+data:
+  query.json: |
+    {
+      "userQuery": "Query::from(\"input2\").joinWith(Query::from(\"input3\"))                          .where(Attribute(\"id\")).equalsTo(Attribute(\"id\"))                          .window(TumblingWindow::of(EventTime(Attribute(\"timestamp\")), Milliseconds(2)))                       .sink(ThroughputSinkDescriptor::create());",
+      "placement": "BottomUp"
+    }
+kind: ConfigMap
+metadata:
+  name: query-config
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: query
+spec:
+  containers:
+    - name: task-pv-container
+      imagePullPolicy: Always
+      image: localhost:5000/query
+      volumeMounts:
+        - name: query-volume
+          mountPath: /query
+  volumes:
+    - name: query-volume
+      configMap:
+        name: query-config
+        
